@@ -90,8 +90,9 @@ involved in any of this — it is not deciding to remember.
 It runs after your turn ends and, when a turn looks like it contains a decision,
 posts to `https://api.getkika.app/hooks/turn`:
 
-- the last assistant message, and the last user message from the transcript
-  (4,000 characters of it at most)
+- the last assistant message (at most 8,000 characters) and the last user
+  message from the transcript (at most 4,000) — the tail of each, since that is
+  where a conclusion is
 - the working directory, and `git remote get-url origin` for it
 - the Claude Code session id
 

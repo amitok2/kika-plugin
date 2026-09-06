@@ -112,7 +112,15 @@ fi
 # `last_assistant_message` rather than the transcript, per Claude Code's own
 # guidance: the transcript is written asynchronously and may not yet contain
 # the turn that just ended.
-LAST=$(printf '%s' "$INPUT" | jq -r '.last_assistant_message // ""')
+# Bounded, like the user's side below. It was not, and the privacy policy and
+# the README both claimed "4,000 characters at most" — true of the user message
+# and not of this one, which can be a whole file dump. A document that overstates
+# a limit is worse than one that states a larger limit honestly, and the server
+# only reads the last 12,000 characters anyway, so nothing is lost by capping.
+#
+# The TAIL is kept, not the head: the conclusion of a reply is at the end, which
+# is the same reason the server keeps the tail of the excerpt it classifies.
+LAST=$(printf '%s' "$INPUT" | jq -r '.last_assistant_message // ""' | tail -c 8000)
 TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // ""')
 
 # The user's side of the turn, from the transcript. Worth reading even though
