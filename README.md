@@ -50,13 +50,22 @@ on Linux or Windows, use the `--header` form above.
 
 ### For a teammate
 
-They install the same way and sign in as themselves. Memory is per-user and
-their engagements are their own.
+They install the same way and sign in as themselves. What they do in their own
+repositories is their own memory.
 
-**Sharing an engagement between two people is not built yet.** If they bind a
-repository you already have an engagement for, they are told it exists and
-refused — so no second graph is created for one piece of work, but they get no
-access to yours either. That is the next real piece of work.
+To put them on an engagement of yours, add them at
+**getkika.app/app/projects** — the engagement, then **People**, then the email
+address they sign in with. They do not need an account first; the invitation
+waits and is claimed the first time they sign in.
+
+From then on their checkout of that repository resolves to *your* graph rather
+than a second copy of it: what they decide, you read, and the trail shows whose
+turn each entry came from. Everyone on an engagement can read and write its
+memory; only the owner decides who else is on it.
+
+Until you add them, a repository that already belongs to an engagement is
+refused rather than duplicated — the agent is told the engagement exists, that
+they are not on it, and that whoever set it up can add them.
 
 ## How the hook works
 
@@ -100,7 +109,9 @@ unauthenticated setup costs nothing and says nothing.
 
 ## What it costs, and how to take it back
 
-Watch the spend at **getkika.app/app/usage**. Everything the hook records is
+Watch the spend at **getkika.app/app/trail**, which shows every turn the hook
+saw — including the ones it saved nothing from, and why — with what each one
+actually cost in tokens. Everything the hook records is
 marked agent-written and unverified: it can never overwrite something from one
 of your meetings, never reaches your meeting notes, and every one is listed at
 **getkika.app/app/activity** with an Undo that removes it from the graph.
