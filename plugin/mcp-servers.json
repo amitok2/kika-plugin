@@ -1,6 +1,8 @@
 {
-  "kika": {
-    "type": "http",
-    "url": "https://api.getkika.app/mcp"
+  "mcpServers": {
+    "kika": {
+      "type": "http",
+      "url": "https://api.getkika.app/mcp"
+    }
   }
 }
