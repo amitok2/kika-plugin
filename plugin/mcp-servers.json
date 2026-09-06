@@ -1,0 +1,6 @@
+{
+  "kika": {
+    "type": "http",
+    "url": "https://api.getkika.app/mcp"
+  }
+}

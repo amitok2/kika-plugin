@@ -1,0 +1,16 @@
+{
+  "name": "kika",
+  "owner": { "name": "Kika", "url": "https://getkika.app" },
+  "description": "Shared memory for the client engagements you run.",
+  "plugins": [
+    {
+      "name": "kika",
+      "source": "./plugin",
+      "displayName": "Kika",
+      "description": "Five MCP tools over your engagement memory, plus an end-of-turn hook that records what was decided without the agent having to remember to.",
+      "homepage": "https://getkika.app/memory",
+      "category": "productivity",
+      "keywords": ["memory", "mcp", "context", "consulting"]
+    }
+  ]
+}
