@@ -9,7 +9,21 @@
             "args": [],
             "async": true,
             "timeout": 120,
-            "statusMessage": "Kika: remembering…"
+            "statusMessage": "Kika: remembering\u2026"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
+            "args": [],
+            "async": true,
+            "timeout": 20,
+            "statusMessage": "Kika: where this stands\u2026"
           }
         ]
       }

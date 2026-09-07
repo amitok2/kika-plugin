@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+#
+# Finding the one credential, shared by every Kika hook.
+#
+# Lifted out of capture.sh when a second hook needed it. Two copies of a
+# credential search is two copies that drift, and the one that drifts is the one
+# nobody notices — a hook that silently finds no token looks exactly like a hook
+# with nothing to say.
+#
+# Sourced, not executed. Sets TOKEN, empty when there is nothing to find.
+# Callers must treat empty as "exit quietly": an uninstalled or unauthenticated
+# setup has to cost nothing and say nothing.
+#
+# Usage:  CWD=<dir> API=<url> . "$(dirname "$0")/token.sh"
+
+# ── The token: ONE credential, the one you already pasted ──────────────────
+#
+# You configured the MCP server with a token. Asking for a second one — an env
+# var, a dotfile — for the half of the product that runs three seconds later is
+# friction we invented, not friction the design requires. So this reads the
+# Authorization header out of the MCP configuration itself.
+#
+# The result is that the whole install is one command:
+#
+#   claude mcp add --transport http kika https://api.getkika.app/mcp \
+#     --header "Authorization: Bearer kika_mcp_…"
+#
+# Looked for in the order Claude Code resolves MCP servers: a project .mcp.json
+# first, then the per-project section of ~/.claude.json, then the global one.
+# The cwd may be a subdirectory of the project root, so parents are walked.
+token_from_mcp() {
+  local f dir
+  # A committed project config, if the team shares one.
+  for dir in "${CLAUDE_PROJECT_DIR:-$CWD}" "$CWD"; do
+    [ -n "$dir" ] || continue
+    f="$dir/.mcp.json"
+    if [ -r "$f" ]; then
+      jq -r '.mcpServers.kika.headers.Authorization // empty' "$f" 2>/dev/null && return
+    fi
+  done
+
+  f="$HOME/.claude.json"
+  [ -r "$f" ] || return
+  # Per-project, walking up from the working directory.
+  dir="$CWD"
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    jq -r --arg d "$dir" '.projects[$d].mcpServers.kika.headers.Authorization // empty' "$f" 2>/dev/null       | grep . && return
+    dir=$(dirname "$dir")
+  done
+  # Global.
+  jq -r '.mcpServers.kika.headers.Authorization // empty' "$f" 2>/dev/null
+}
+
+# Connected over OAuth instead? Then there is no header to read — but Claude
+# Code is holding a live access token for this very server, and keeps it
+# refreshed. Using it means OAuth users get capture with no second credential
+# either, which is the difference between "capture works" and "capture works if
+# you also went and made a token".
+#
+# The token is OURS: our authorization server issued it, for our resource, to
+# this user. Reading it is not reaching into somebody else's secret.
+#
+# Matched on the serverUrl, OR on the entry key naming this server. The key
+# carries a hash suffix (`kika|2df240d1…`) so only its name part is compared.
+# Both, because either alone is brittle: a self-hosted or staging API breaks a
+# URL-only match, and a server the user named something else breaks a key-only
+# one.
+token_from_oauth() {
+  local raw
+  # The portable store first; the macOS keychain second. Neither existing is
+  # normal and must stay silent.
+  if [ -r "$HOME/.claude/.credentials.json" ]; then
+    raw=$(cat "$HOME/.claude/.credentials.json" 2>/dev/null)
+  elif command -v security >/dev/null 2>&1; then
+    raw=$(security find-generic-password -s 'Claude Code-credentials' -w 2>/dev/null)
+  fi
+  [ -n "$raw" ] || return
+  printf '%s' "$raw" | jq -r --arg api "$API" '
+    (.mcpOAuth // {})
+    | to_entries
+    | map(select(
+        ((.value.serverUrl // "") | startswith($api))
+        or ((.key | split("|")[0] | ascii_downcase) == "kika")
+      ))
+    # Expired tokens are skipped rather than sent: Claude Code refreshes on its
+    # own schedule, so the next turn will find a live one.
+    | map(select((.value.expiresAt // 0) > (now * 1000)))
+    | .[0].value.accessToken // empty' 2>/dev/null
+}
+
+TOKEN="${KIKA_TOKEN:-}"
+if [ -z "$TOKEN" ]; then
+  # Strip the scheme: the config holds "Bearer kika_mcp_…", we want the token.
+  TOKEN=$(token_from_mcp | head -1 | sed -E 's/^[Bb]earer[[:space:]]+//' | tr -d '[:space:]')
+fi
+[ -z "$TOKEN" ] && TOKEN=$(token_from_oauth | tr -d '[:space:]')
+# Last resort, and now genuinely a last resort.
+if [ -z "$TOKEN" ] && [ -r "$HOME/.kika/token" ]; then
+  TOKEN=$(tr -d '[:space:]' < "$HOME/.kika/token")
+fi
+
