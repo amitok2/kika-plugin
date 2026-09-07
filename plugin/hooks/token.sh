@@ -28,6 +28,19 @@
 # Looked for in the order Claude Code resolves MCP servers: a project .mcp.json
 # first, then the per-project section of ~/.claude.json, then the global one.
 # The cwd may be a subdirectory of the project root, so parents are walked.
+# Where Claude Code keeps its files. CLAUDE_CONFIG_DIR moves all of it —
+# settings, history, plugins — and a hook that hardcodes ~/.claude finds nothing
+# for anyone who has set it. On Windows ~/.claude is %USERPROFILE%\.claude, so
+# the same path works there under Git Bash.
+CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
+# Say why nothing happened, when asked. Capture is silent by design — a hook
+# that complains after every message gets disabled within a day — but silence
+# also means someone whose capture never fires has no way to find out. This is
+# the way out, and it goes to stderr so it can never contaminate a hook whose
+# stdout is injected as context.
+kika_debug() { [ -n "${KIKA_DEBUG:-}" ] && printf 'kika: %s\n' "$1" >&2; return 0; }
+
 token_from_mcp() {
   local f dir
   # A committed project config, if the team shares one.
@@ -39,7 +52,10 @@ token_from_mcp() {
     fi
   done
 
-  f="$HOME/.claude.json"
+  # Also relocatable, so try the configured directory before $HOME.
+  for f in "$CONFIG_DIR/.claude.json" "$HOME/.claude.json"; do
+    [ -r "$f" ] && break
+  done
   [ -r "$f" ] || return
   # Per-project, walking up from the working directory.
   dir="$CWD"
@@ -69,8 +85,8 @@ token_from_oauth() {
   local raw
   # The portable store first; the macOS keychain second. Neither existing is
   # normal and must stay silent.
-  if [ -r "$HOME/.claude/.credentials.json" ]; then
-    raw=$(cat "$HOME/.claude/.credentials.json" 2>/dev/null)
+  if [ -r "$CONFIG_DIR/.credentials.json" ]; then
+    raw=$(cat "$CONFIG_DIR/.credentials.json" 2>/dev/null)
   elif command -v security >/dev/null 2>&1; then
     raw=$(security find-generic-password -s 'Claude Code-credentials' -w 2>/dev/null)
   fi
@@ -99,3 +115,9 @@ if [ -z "$TOKEN" ] && [ -r "$HOME/.kika/token" ]; then
   TOKEN=$(tr -d '[:space:]' < "$HOME/.kika/token")
 fi
 
+kika_debug "config dir: $CONFIG_DIR"
+if [ -n "$TOKEN" ]; then
+  kika_debug "found a token (${#TOKEN} chars)"
+else
+  kika_debug "NO token — looked at: \$KIKA_TOKEN, the Authorization header on the kika MCP server in $CONFIG_DIR/.claude.json and .mcp.json, the OAuth token in $CONFIG_DIR/.credentials.json (and the macOS keychain), and $HOME/.kika/token"
+fi
