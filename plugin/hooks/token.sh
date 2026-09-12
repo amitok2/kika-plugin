@@ -82,7 +82,12 @@ token_from_mcp() {
 # URL-only match, and a server the user named something else breaks a key-only
 # one.
 token_from_oauth() {
-  local raw
+  # Initialised, because under `set -u` an unset local is a crash, and this one
+  # stays unset on any Linux box without a credentials file — there is no
+  # keychain to fall back to, so neither branch below runs. Verified in a
+  # container: the hook died with "raw: unbound variable" on exactly the
+  # machines the platform note claimed to support.
+  local raw=""
   # The portable store first; the macOS keychain second. Neither existing is
   # normal and must stay silent.
   if [ -r "$CONFIG_DIR/.credentials.json" ]; then
@@ -96,7 +101,10 @@ token_from_oauth() {
     | to_entries
     | map(select(
         ((.value.serverUrl // "") | startswith($api))
-        or ((.key | split("|")[0] | ascii_downcase) == "kika")
+        # The key is "kika|<hash>" for a server added by hand and
+        # "plugin:kika:kika|<hash>" for one the plugin installed, so compare
+        # the last colon-separated part of the name, not the whole of it.
+        or ((.key | split("|")[0] | ascii_downcase | split(":") | last) == "kika")
       ))
     # Expired tokens are skipped rather than sent: Claude Code refreshes on its
     # own schedule, so the next turn will find a live one.

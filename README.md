@@ -2,6 +2,9 @@
 
 One install, one credential, both halves of the memory:
 
+![What the agent sees at session start: the engagement's blockers, decisions with their reasons, risks, and what is no longer true — then a reply that cites the fact it used](docs/session-start.png)
+
+
 - **the MCP server** — `get_brief`, `search_memory`, `remember`, `update_memory`,
   `close_loop`; and
 - **the Stop hook** — which reads each finished turn and records what was
