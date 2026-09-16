@@ -45,11 +45,30 @@ TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // ""')
 # The user's side of the turn, from the transcript. Worth reading even though
 # it lags, because the DECISION is usually in what the user said ("no, use
 # Postgres, we need RLS") while the assistant's reply is the work that followed.
+# The HUMAN's last message — not the last entry of type "user". In Claude
+# Code's transcript a tool result is also a "user" entry (that is how the API
+# frames it), so on any turn that used a tool, "last user entry" was a page of
+# {"tool_use_id": …, "content": …} JSON and the thing the person actually typed
+# was never sent. The classifier was reading tool output where it expected a
+# request, and the trail showed JSON where it should have shown a sentence.
+#
+# A human entry is one whose content is a plain string, or an array with text
+# blocks and no tool_result block. The tail of it, since that is where a
+# conclusion is.
 USER_MSG=""
 if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
   USER_MSG=$(tail -n 400 "$TRANSCRIPT" 2>/dev/null \
-    | jq -rs '[.[] | select(.type == "user")] | last | .message.content // ""' 2>/dev/null \
-    | head -c 4000)
+    | jq -rs '
+        [ .[]
+          | select(.type == "user")
+          | .message.content
+          | if type == "string" then .
+            elif type == "array" and any(.[]; .type == "tool_result") then empty
+            elif type == "array" then map(select(.type == "text") | .text) | join("\n")
+            else empty end
+          | select(length > 0)
+        ] | last // ""' 2>/dev/null \
+    | tail -c 4000)
 fi
 
 EXCERPT=$(printf 'User:\n%s\n\nAssistant:\n%s' "$USER_MSG" "$LAST")
@@ -89,16 +108,22 @@ fi
 # what lets a teammate's capture land in the same project rather than a second
 # graph. Normalisation happens server-side, so every spelling is fine here.
 REMOTE=""
+BRANCH=""
 if [ -n "$CWD" ] && [ -d "$CWD" ]; then
   REMOTE=$(git -C "$CWD" remote get-url origin 2>/dev/null || true)
+  # Which branch the decision was made on. A decision recorded on a branch
+  # that never merged is a decision that never happened, and a reader six
+  # weeks later cannot tell without this.
+  BRANCH=$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
 fi
 
 jq -n \
   --arg excerpt "$EXCERPT" \
   --arg cwd "$CWD" \
   --arg gitRemote "$REMOTE" \
+  --arg branch "$BRANCH" \
   --arg sessionId "$(printf '%s' "$INPUT" | jq -r '.session_id // ""')" \
-  '{excerpt: $excerpt, cwd: $cwd, gitRemote: $gitRemote, sessionId: $sessionId}' \
+  '{excerpt: $excerpt, cwd: $cwd, gitRemote: $gitRemote, branch: $branch, sessionId: $sessionId}' \
   | curl -s -m 120 -X POST "$API/hooks/turn" \
       -H "authorization: Bearer $TOKEN" \
       -H 'content-type: application/json' \
