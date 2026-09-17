@@ -17,7 +17,7 @@ A hook is not advice.
 ## Install
 
 ```
-/plugin marketplace add amitok2/kika-plugin
+/plugin marketplace add usekika/kika-plugin
 /plugin install kika@kika
 ```
 
